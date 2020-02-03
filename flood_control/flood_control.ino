@@ -20,7 +20,9 @@ String ssid = "Abhinav";
 String pass = "abcdefgh";
 String host = "api.thingspeal.com";
 String port = "80";
-String api = "";
+String api[5] = {"", "", "", "", ""};
+
+unsigned long distance;
 
 volatile byte pulseCount;
 float flowRate;
@@ -57,10 +59,10 @@ void WifiConnect()
 	SndCmd("AT+CWJAP=\""+ssid+"\",\""+pass+"\"", "OK", 10);
 }
 
-void SendData(int level, float flow, bool motor)
+void SendData(int i)
 {
 	//	Field 1 -> Level, 	Field 2 -> Flow,	Field 3 -> Motor
-	String data = "GET https://api.thingspeak.com/update?api_key=" + api + "&field1=" + String(level) + "&field2=" + String(flow) + "&field3=" + String(motor);
+	String data = "GET https://api.thingspeak.com/update?api_key=" + api[i] + "&field1=" + String(distance) + "&field2=" + String(int(flowRate)) + "&field3=" + String(motorState);
 
 	SndCmd("AT+CIPMUX=0", "OK", 5);
 	SndCmd("AT+CIPSTART=\"TCP\",\"" + host + "\"," + port, "OK", 15);
@@ -69,7 +71,7 @@ void SendData(int level, float flow, bool motor)
 	SndCmd("AT+CIPCLOSE", "OK", 5);
 }
 
-int GetDistance()
+void GetDistance()
 {
 	digitalWrite(trigPin, LOW);	//	Reset the pin before reading value
 	delayMicroseconds(2);
@@ -82,36 +84,7 @@ int GetDistance()
 	//	Reading the echo of wave
 	int duration = pulseIn(echoPin, HIGH);
 
-	return duration * 0.034 / 2;
-}
-
-int FromSensor(int num)
-{
-	digitalWrite(S0, LOW);
-	digitalWrite(S1, LOW);
-	digitalWrite(S2, LOW);
-	switch(num)
-	{
-	case 1:
-		digitalWrite(S0, HIGH);
-		return GetDistance();
-	case 2:
-		digitalWrite(S1, HIGH);
-		return GetDistance();
-	case 3:
-		digitalWrite(S0, HIGH);
-		digitalWrite(S1, HIGH);
-		return GetDistance();
-	case 4:
-		digitalWrite(S2, HIGH);
-		return GetDistance();
-	case 5:
-		digitalWrite(S2, HIGH);
-		digitalWrite(S0, HIGH);
-		return GetDistance();
-	default:
-	    return -1;
-	}
+	distance = duration * 0.034 / 2;
 }
 
 void PulseCounter()
@@ -143,6 +116,43 @@ void GetFlow()
 	}
 }
 
+void FromSensor(int num)
+{
+	digitalWrite(S0, LOW);
+	digitalWrite(S1, LOW);
+	digitalWrite(S2, LOW);
+	switch(num)
+	{
+	case 1:
+		digitalWrite(S0, HIGH);
+		GetDistance();
+		GetFlow();
+		break;
+	case 2:
+		digitalWrite(S1, HIGH);
+		GetDistance();
+		GetFlow();
+		break;
+	case 3:
+		digitalWrite(S0, HIGH);
+		digitalWrite(S1, HIGH);
+		GetDistance();
+		GetFlow();
+		break;
+	case 4:
+		digitalWrite(S2, HIGH);
+		GetDistance();
+		GetFlow();
+		break;
+	case 5:
+		digitalWrite(S2, HIGH);
+		digitalWrite(S0, HIGH);
+		GetDistance();
+		GetFlow();
+		break;
+	}
+}
+
 void setup()
 {
 	Serial.begin(9600);
@@ -155,6 +165,7 @@ void setup()
 	pinMode(S2, OUTPUT);
 	pinMode(trigPin, OUTPUT);
 	pinMode(echoPin, INPUT);
+	distance = 0;
 
 	pinMode(flowPin, INPUT);
 	digitalWrite(flowPin, HIGH);
@@ -172,8 +183,10 @@ void setup()
 
 void loop()
 {
-	int level = GetDistance();
-	GetFlow();
-	SendData(level, flowRate, motorState);
+	for(int i = 1; i <= 5; ++i)
+	{
+		FromSensor(i);
+		SendData(i);
+	}
 	delay(1000 * 60 * 5);
 }
