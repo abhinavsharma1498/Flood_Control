@@ -31,6 +31,7 @@ unsigned long totalML;
 unsigned long oldTime;
 
 bool motorState;
+unsigned long depth;
 
 void SndCmd(String cmd, char* reply, int maxTime)
 {
@@ -179,6 +180,7 @@ void setup()
 	pinMode(motorPin, OUTPUT);
 	digitalWrite(motorPin, LOW);
 	motorState = false;
+	depth = 100;
 }
 
 void loop()
@@ -186,6 +188,16 @@ void loop()
 	for(int i = 1; i <= 5; ++i)
 	{
 		FromSensor(i);
+		if(distance < (0.25*depth))
+		{
+			digitalWrite(motoPin, HIGH);
+			motorState = true;
+		}
+		else if(distance > (0.75*depth))
+		{
+			digitalWrite(motorPin, LOW);
+			motorState = false;
+		}
 		SendData(i);
 	}
 	delay(1000 * 60 * 5);
