@@ -5,15 +5,13 @@
 
 #define trigPin 3
 #define echoPin 4
-#define S0 8
-#define S1 9
-#define S2 10
+#define S0 10
+#define S1 11
+#define S2 12
 
 #define flowInterrupt 0	//	Interrupt 0 is attached to digital pin 2
 #define flowPin 2
 #define calibrationFactor 4.5	//	Hall effect flow sensor outputs approximately 4.5 pulses per second per litre/minute of flow
-
-#define motorPin 5
 
 SoftwareSerial esp(RX, TX);
 String ssid = "Abhinav";
@@ -30,7 +28,8 @@ unsigned int flowML;
 unsigned long totalML;
 unsigned long oldTime;
 
-bool motorState;
+bool motorState[5];
+int motorPin[5];
 unsigned long depth;
 
 void SndCmd(String cmd, char* reply, int maxTime)
@@ -63,7 +62,7 @@ void WifiConnect()
 void SendData(int i)
 {
 	//	Field 1 -> Level, 	Field 2 -> Flow,	Field 3 -> Motor
-	String data = "GET https://api.thingspeak.com/update?api_key=" + api[i] + "&field1=" + String(distance) + "&field2=" + String(int(flowRate)) + "&field3=" + String(motorState);
+	String data = "GET https://api.thingspeak.com/update?api_key=" + api[i-1] + "&field1=" + String(distance) + "&field2=" + String(int(flowRate)) + "&field3=" + String(motorState[i-1]);
 
 	SndCmd("AT+CIPMUX=0", "OK", 5);
 	SndCmd("AT+CIPSTART=\"TCP\",\"" + host + "\"," + port, "OK", 15);
@@ -117,12 +116,12 @@ void GetFlow()
 	}
 }
 
-void FromSensor(int num)
+void FromSensor(int i)
 {
 	digitalWrite(S0, LOW);
 	digitalWrite(S1, LOW);
 	digitalWrite(S2, LOW);
-	switch(num)
+	switch(i)
 	{
 	case 1:
 		digitalWrite(S0, HIGH);
@@ -152,6 +151,10 @@ void FromSensor(int num)
 		GetFlow();
 		break;
 	}
+	Serial.println("Sensor" + String(i) + ":");
+	Serial.println("Level: " + String(distance));
+	Serial.println("Flow Rate: " + String(flowRate));
+	Serial.println("Motor State: " + String(motorState[i-1]));
 }
 
 void setup()
@@ -177,9 +180,13 @@ void setup()
 	oldTime = 0;
 	attachInterrupt(flowInterrupt, PulseCounter, FALLING);
 
-	pinMode(motorPin, OUTPUT);
-	digitalWrite(motorPin, LOW);
-	motorState = false;
+	for(int i = 0, pin = 5; i < 5; ++i, ++pin)
+	{
+		motorPin[i] = pin;
+		pinMode(motorPin[i], OUTPUT);
+		digitalWrite(motorPin[i], LOW);
+		motorState[i] = false;
+	}
 	depth = 100;
 }
 
@@ -190,13 +197,13 @@ void loop()
 		FromSensor(i);
 		if(distance < (0.25*depth))
 		{
-			digitalWrite(motoPin, HIGH);
-			motorState = true;
+			digitalWrite(motorPin[i-1], HIGH);
+			motorState[i-1] = true;
 		}
 		else if(distance > (0.75*depth))
 		{
-			digitalWrite(motorPin, LOW);
-			motorState = false;
+			digitalWrite(motorPin[i-1], LOW);
+			motorState[i-1] = false;
 		}
 		SendData(i);
 	}
